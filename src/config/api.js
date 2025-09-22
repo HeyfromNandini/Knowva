@@ -11,8 +11,11 @@ export const API_ENDPOINTS = {
   // Keywords API
   KEYWORDS: `${API_BASE_URL}/keywords`,
   
+  // Papers API
+  PAPERS: `${API_BASE_URL}/papers`,
+  APPROVE: `${API_BASE_URL}/approve`,
+  
   // Future endpoints can be added here
-  // PAPERS: `${API_BASE_URL}/papers`,
   // COLLECTIONS: `${API_BASE_URL}/collections`,
   // USERS: `${API_BASE_URL}/users`,
 };
@@ -88,6 +91,53 @@ export const apiService = {
       console.error('Add keyword API error:', error);
       throw error;
     }
+  },
+
+  // Papers API
+  async getPapers() {
+    try {
+      const response = await fetch(API_ENDPOINTS.PAPERS, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Get papers API error:', error);
+      throw error;
+    }
+  },
+
+  async approvePaper(paperId, status, comments, notes = '') {
+    try {
+      const response = await fetch(API_ENDPOINTS.APPROVE, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paper_id: paperId,
+          status,
+          comments,
+          notes
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Approve paper API error:', error);
+      throw error;
+    }
   }
 };
 
@@ -97,6 +147,13 @@ export const KEYWORD_CONSTANTS = {
   STATUSES: ['Active', 'Disabled'],
   MAX_KEYWORD_LENGTH: 100,
   MIN_KEYWORD_LENGTH: 2
+};
+
+export const PAPER_CONSTANTS = {
+  STATUSES: ['Approved', 'Rejected', 'Pending'],
+  INTERVENTIONS: ['Research - Farmed animal welfare science', 'Research - Wild animal welfare'],
+  OUTCOMES: ['Improvement of Welfare Standards', 'Increased Knowledge/Skills for Animal Advocacy'],
+  ITEMS_PER_PAGE: 12
 };
 
 export default apiService;

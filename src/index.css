@@ -1117,6 +1117,14 @@ nav[aria-label="Tabs"] a:not(.active):hover {
   border-width: 3px;
 }
 
+/* Line clamp utilities */
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
