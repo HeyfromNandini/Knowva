@@ -1,258 +1,342 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { apiService } from '../config/api.js';
 
 const ApprovedPapers = () => {
+  const navigate = useNavigate();
+  const [papers, setPapers] = useState([]);
+  const [filteredPapers, setFilteredPapers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFilters, setSelectedFilters] = useState({
-    date: '',
-    category: '',
-    intervention: '',
-    outcome: '',
-    industrySegment: ''
-  });
+  const [sortBy, setSortBy] = useState('title');
+  const [sortOrder, setSortOrder] = useState('asc');
 
-  const papers = [
-    {
-      id: 1,
-      title: 'The Impact of AI on Customer Service Efficiency',
-      category: 'Technology',
-      intervention: 'AI Implementation',
-      outcome: 'Improved Response Time',
-      industrySegment: 'Customer Service',
-      date: '2023-01-15'
-    },
-    {
-      id: 2,
-      title: 'Enhancing Employee Productivity with Remote Work Tools',
-      category: 'Human Resources',
-      intervention: 'Remote Work Tools',
-      outcome: 'Increased Productivity',
-      industrySegment: 'Technology',
-      date: '2023-02-20'
-    },
-    {
-      id: 3,
-      title: 'The Role of Data Analytics in Marketing Optimization',
-      category: 'Marketing',
-      intervention: 'Data Analytics',
-      outcome: 'Optimized Campaigns',
-      industrySegment: 'Marketing',
-      date: '2023-03-25'
-    },
-    {
-      id: 4,
-      title: 'Sustainable Practices in Manufacturing: A Case Study',
-      category: 'Manufacturing',
-      intervention: 'Sustainable Practices',
-      outcome: 'Reduced Waste',
-      industrySegment: 'Manufacturing',
-      date: '2023-04-30'
-    },
-    {
-      id: 5,
-      title: 'The Future of Healthcare: Telemedicine and Patient Outcomes',
-      category: 'Healthcare',
-      intervention: 'Telemedicine',
-      outcome: 'Improved Patient Outcomes',
-      industrySegment: 'Healthcare',
-      date: '2023-05-05'
-    },
-    {
-      id: 6,
-      title: 'Cybersecurity Threats and Mitigation Strategies for Small Businesses',
-      category: 'Cybersecurity',
-      intervention: 'Cybersecurity Measures',
-      outcome: 'Reduced Security Breaches',
-      industrySegment: 'Small Business',
-      date: '2023-06-10'
-    },
-    {
-      id: 7,
-      title: 'The Impact of Social Media Marketing on Brand Awareness',
-      category: 'Marketing',
-      intervention: 'Social Media Marketing',
-      outcome: 'Increased Brand Awareness',
-      industrySegment: 'Marketing',
-      date: '2023-07-15'
-    },
-    {
-      id: 8,
-      title: 'Innovations in Financial Technology: Blockchain and Cryptocurrency',
-      category: 'Finance',
-      intervention: 'Blockchain Technology',
-      outcome: 'Enhanced Security',
-      industrySegment: 'Finance',
-      date: '2023-08-20'
+  // Load papers on component mount
+  useEffect(() => {
+    loadApprovedPapers();
+  }, []);
+
+  // Filter and sort papers when dependencies change
+  useEffect(() => {
+    let filtered = [...papers];
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(paper => 
+        paper.Title?.toLowerCase().includes(term) ||
+        paper.Authors?.toLowerCase().includes(term) ||
+        paper['AI-Generated Summary']?.toLowerCase().includes(term) ||
+        paper['Source Keyword']?.toLowerCase().includes(term) ||
+        paper['AI-Outcomes']?.toLowerCase().includes(term)
+      );
     }
-  ];
 
-  const filteredPapers = papers.filter(paper => {
-    const matchesSearch = paper.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         paper.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         paper.intervention.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         paper.outcome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         paper.industrySegment.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSearch;
-  });
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let aVal, bVal;
+      
+      switch (sortBy) {
+        case 'title':
+          aVal = a.Title || '';
+          bVal = b.Title || '';
+          break;
+        case 'authors':
+          aVal = a.Authors || '';
+          bVal = b.Authors || '';
+          break;
+        case 'year':
+          aVal = a['Publication Year'] || 0;
+          bVal = b['Publication Year'] || 0;
+          break;
+        case 'date':
+          aVal = new Date(a['Date Retrieved'] || 0);
+          bVal = new Date(b['Date Retrieved'] || 0);
+          break;
+        default:
+          return 0;
+      }
 
-  const handleFilterChange = (filterType, value) => {
-    setSelectedFilters(prev => ({
-      ...prev,
-      [filterType]: value
-    }));
+      if (sortOrder === 'asc') {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
+    });
+
+    setFilteredPapers(filtered);
+  }, [papers, searchTerm, sortBy, sortOrder]);
+
+  // Helper functions for filters
+  const resetFilters = () => {
+    setSearchTerm('');
+    setSortBy('title');
+    setSortOrder('asc');
+  };
+
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (searchTerm.trim()) count++;
+    return count;
+  };
+
+  const getActiveFilters = () => {
+    const filters = [];
+    if (searchTerm.trim()) {
+      filters.push({ type: 'Search', value: searchTerm, key: 'search' });
+    }
+    return filters;
+  };
+
+  const removeFilter = (filterKey) => {
+    switch (filterKey) {
+      case 'search':
+        setSearchTerm('');
+        break;
+      default:
+        break;
+    }
+  };
+
+  const loadApprovedPapers = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const data = await apiService.getApprovedPapers();
+      setPapers(data || []);
+    } catch (err) {
+      console.error('Error loading approved papers:', err);
+      setError('Failed to load approved papers. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSort = (field) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const handleViewDetails = (paper) => {
+    // Store paper data in localStorage for PaperDetails component
+    localStorage.setItem('selectedPaper', JSON.stringify(paper));
+    navigate('/paper-details');
+  };
+
+  const getSortIcon = (field) => {
+    if (sortBy !== field) return 'unfold_more';
+    return sortOrder === 'asc' ? 'keyboard_arrow_up' : 'keyboard_arrow_down';
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
   };
 
   return (
-    <main className="flex-grow w-full px-4 sm:px-6 lg:px-14 py-8">
+    <main className="flex-1 w-full px-4 sm:px-6 lg:px-14 py-8">
       <div className="mx-auto max-w-[1360px]">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-3">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Library</h2>
-            <div className="flex items-center gap-2">
-              <button className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-green/20 text-emerald-green font-medium hover:bg-emerald-green/30 transition-colors">
-                <span className="material-symbols-outlined text-base">download</span>
-                <span className="truncate text-sm">Export</span>
+        <div className="mb-6">
+          <h1 className="text-4xl font-bold text-white">Approved Papers</h1>
+          <p className="text-gray-400 mt-1 text-base">Browse and manage approved research papers in the library.</p>
+        </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+            {error}
+          </div>
+        )}
+
+        {/* Papers Table Container */}
+        <div className="bg-gray-900/50 rounded-xl border border-gray-800">
+          {/* Search and Filter Bar */}
+          <div className="p-4 border-b border-gray-800">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center mb-4">
+              <div className="relative w-full sm:w-80">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">search</span>
+                <input 
+                  className="form-input w-full rounded-lg border-gray-700 bg-background-dark focus:ring-primary focus:border-primary pl-10 text-sm" 
+                  placeholder="Search papers, authors, keywords..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                {getActiveFiltersCount() > 0 && (
+                  <span className="text-white/70 text-sm">
+                    {getActiveFiltersCount()} filter{getActiveFiltersCount() !== 1 ? 's' : ''} applied
+                  </span>
+                )}
+                <button
+                  onClick={resetFilters}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-base">refresh</span>
+                  Reset
+                </button>
+              </div>
+            </div>
+            
+            {/* Applied Filters */}
+            {getActiveFilters().length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-white/60 text-sm font-medium">Active filters:</span>
+                  {getActiveFilters().map((filter) => (
+                    <span
+                      key={filter.key}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary border border-primary/30"
+                    >
+                      <span>{filter.type}: {filter.value}</span>
+                      <button
+                        onClick={() => removeFilter(filter.key)}
+                        className="hover:text-primary/80 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-sm">close</span>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Sort Controls */}
+            <div className="flex gap-2 flex-wrap justify-center sm:justify-start">
+              <button 
+                onClick={() => handleSort('title')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+              >
+                <span>Title</span>
+                <span className="material-symbols-outlined text-base">{getSortIcon('title')}</span>
               </button>
-              <button className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-green text-charcoal font-medium hover:bg-emerald-green/90 transition-colors">
-                <span className="material-symbols-outlined text-base">add</span>
-                <span className="truncate text-sm">Add to Directory</span>
+              <button 
+                onClick={() => handleSort('authors')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+              >
+                <span>Authors</span>
+                <span className="material-symbols-outlined text-base">{getSortIcon('authors')}</span>
+              </button>
+              <button 
+                onClick={() => handleSort('year')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+              >
+                <span>Year</span>
+                <span className="material-symbols-outlined text-base">{getSortIcon('year')}</span>
+              </button>
+              <button 
+                onClick={() => handleSort('date')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+              >
+                <span>Date Added</span>
+                <span className="material-symbols-outlined text-base">{getSortIcon('date')}</span>
               </button>
             </div>
           </div>
-          <div className="mb-6">
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">search</span>
-              <input
-                className="form-input w-full rounded-lg border-slate-300 dark:border-light-dark bg-white dark:bg-light-dark py-3 pl-12 pr-4 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-1 focus:ring-emerald-green focus:border-emerald-green"
-                placeholder="Search approved papers..."
-                type="search"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 mb-8">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-200/50 dark:bg-light-dark text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-light-dark/70 text-sm font-medium transition-colors">
-              <span>Date</span>
-              <span className="material-symbols-outlined text-base">expand_more</span>
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-200/50 dark:bg-light-dark text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-light-dark/70 text-sm font-medium transition-colors">
-              <span>Category</span>
-              <span className="material-symbols-outlined text-base">expand_more</span>
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-200/50 dark:bg-light-dark text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-light-dark/70 text-sm font-medium transition-colors">
-              <span>Intervention</span>
-              <span className="material-symbols-outlined text-base">expand_more</span>
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-200/50 dark:bg-light-dark text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-light-dark/70 text-sm font-medium transition-colors">
-              <span>Outcome</span>
-              <span className="material-symbols-outlined text-base">expand_more</span>
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-200/50 dark:bg-light-dark text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-light-dark/70 text-sm font-medium transition-colors">
-              <span>Industry Segment</span>
-              <span className="material-symbols-outlined text-base">expand_more</span>
-            </button>
-          </div>
-          <div className="overflow-x-auto bg-white dark:bg-light-dark rounded-lg border border-slate-200/50 dark:border-slate-700/50">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-100 dark:bg-charcoal/50">
+
+          {/* Papers Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-base text-left">
+              <thead className="text-sm text-gray-400 uppercase bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 min-w-[250px]" scope="col">Title</th>
-                  <th className="px-6 py-3 min-w-[150px]" scope="col">Category</th>
-                  <th className="px-6 py-3 min-w-[150px]" scope="col">Intervention</th>
-                  <th className="px-6 py-3 min-w-[150px]" scope="col">Outcome</th>
-                  <th className="px-6 py-3 min-w-[150px]" scope="col">Industry Segment</th>
-                  <th className="px-6 py-3 min-w-[120px]" scope="col">Date</th>
+                  <th className="px-6 py-3 font-medium" scope="col">Title</th>
+                  <th className="px-6 py-3 font-medium" scope="col">Authors</th>
+                  <th className="px-6 py-3 font-medium" scope="col">Year</th>
+                  <th className="px-6 py-3 font-medium" scope="col">Outcome</th>
+                  <th className="px-6 py-3 font-medium" scope="col">Date Added</th>
+                  <th className="px-6 py-3 font-medium text-right" scope="col">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200/50 dark:divide-slate-700/50">
-                {filteredPapers.map((paper) => (
-                  <tr key={paper.id} className="hover:bg-slate-100/50 dark:hover:bg-charcoal/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{paper.title}</td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{paper.category}</td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{paper.intervention}</td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{paper.outcome}</td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{paper.industrySegment}</td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{paper.date}</td>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center text-white/70">
+                      <div className="flex flex-col items-center justify-center gap-4">
+                        <div className="relative">
+                          <div className="w-8 h-8 border-3 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                          <div className="absolute inset-0 w-8 h-8 border-3 border-transparent border-t-primary/60 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div>
+                        </div>
+                        <p className="text-base font-medium">Loading approved papers...</p>
+                      </div>
+                    </td>
                   </tr>
-                ))}
+                ) : filteredPapers.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center text-white/70">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center">
+                          <span className="material-symbols-outlined text-2xl">article</span>
+                        </div>
+                        <p className="text-base font-medium">No approved papers found</p>
+                        <p className="text-sm text-white/50">
+                          {searchTerm ? 'Try adjusting your search terms' : 'No approved papers available at the moment'}
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPapers.map((paper) => (
+                    <tr key={paper['Paper ID']} className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-white">
+                        <div className="max-w-xs truncate">
+                          {paper.Title || 'Untitled'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-300">
+                        <div className="max-w-xs truncate">
+                          {paper.Authors || 'Unknown'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-300">
+                        {paper['Publication Year'] || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 text-gray-300">
+                        <div className="max-w-xs truncate">
+                          {paper['AI-Outcomes'] || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-300">
+                        {formatDate(paper['Date Retrieved'])}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex gap-2 justify-end">
+                          <button 
+                            onClick={() => handleViewDetails(paper)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-700 hover:text-primary transition-colors"
+                            title="View Details"
+                          >
+                            <span className="material-symbols-outlined text-lg">open_in_new</span>
+                          </button>
+                          {paper['DOI / URL'] && (
+                            <a
+                              href={paper['DOI / URL']}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-700 hover:text-primary transition-colors"
+                              title="View Original Paper"
+                            >
+                              <span className="material-symbols-outlined text-lg">link</span>
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
-        </div>
-        <div className="lg:col-span-1 space-y-8">
-          <div className="bg-white dark:bg-light-dark p-6 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Top Industry Segments</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Researched this month</p>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Animal Welfare</span>
-                <span className="text-sm font-semibold text-neon-green">34%</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-charcoal rounded-full h-2">
-                <div className="bg-neon-green h-2 rounded-full" style={{width: '34%'}}></div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Aquaculture</span>
-                <span className="text-sm font-semibold text-neon-green">25%</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-charcoal rounded-full h-2">
-                <div className="bg-neon-green h-2 rounded-full" style={{width: '25%'}}></div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Plant-based Foods</span>
-                <span className="text-sm font-semibold text-neon-green">18%</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-charcoal rounded-full h-2">
-                <div className="bg-neon-green h-2 rounded-full" style={{width: '18%'}}></div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Alternative Proteins</span>
-                <span className="text-sm font-semibold text-neon-green">15%</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-charcoal rounded-full h-2">
-                <div className="bg-neon-green h-2 rounded-full" style={{width: '15%'}}></div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Other</span>
-                <span className="text-sm font-semibold text-neon-green">8%</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-charcoal rounded-full h-2">
-                <div className="bg-neon-green h-2 rounded-full" style={{width: '8%'}}></div>
-              </div>
+
+          {/* Summary Bar */}
+          {!isLoading && (
+            <div className="p-4 border-t border-gray-800 text-center text-gray-400 text-sm">
+              Showing {filteredPapers.length} of {papers.length} approved papers
             </div>
-          </div>
-          <div className="bg-white dark:bg-light-dark p-6 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Directories</h3>
-            <ul className="space-y-3">
-              <li>
-                <a className="flex items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-emerald-green dark:hover:text-emerald-green transition-colors" href="#">
-                  <span className="material-symbols-outlined text-emerald-green">folder</span>
-                  <span>Fish Welfare Folder</span>
-                </a>
-              </li>
-              <li>
-                <a className="flex items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-emerald-green dark:hover:text-emerald-green transition-colors" href="#">
-                  <span className="material-symbols-outlined text-emerald-green">folder</span>
-                  <span>Broiler Chicken Welfare</span>
-                </a>
-              </li>
-              <li>
-                <a className="flex items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-emerald-green dark:hover:text-emerald-green transition-colors" href="#">
-                  <span className="material-symbols-outlined text-emerald-green">folder</span>
-                  <span>Cage-Free Eggs Analysis</span>
-                </a>
-              </li>
-              <li>
-                <a className="flex items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-emerald-green dark:hover:text-emerald-green transition-colors" href="#">
-                  <span className="material-symbols-outlined text-emerald-green">folder</span>
-                  <span>Policy Impact Reports</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
+          )}
         </div>
       </div>
     </main>

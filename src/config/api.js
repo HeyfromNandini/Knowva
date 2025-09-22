@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   
   // Papers API
   PAPERS: `${API_BASE_URL}/papers`,
+  APPROVED_PAPERS: `${API_BASE_URL}/approved-papers`,
   APPROVE: `${API_BASE_URL}/approve`,
   
   // Future endpoints can be added here
@@ -110,6 +111,26 @@ export const apiService = {
       return await response.json();
     } catch (error) {
       console.error('Get papers API error:', error);
+      throw error;
+    }
+  },
+
+  async getApprovedPapers() {
+    try {
+      const response = await fetch(API_ENDPOINTS.APPROVED_PAPERS, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Get approved papers API error:', error);
       throw error;
     }
   },
