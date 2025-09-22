@@ -1,33 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Footer from '../components/Footer.jsx';
-
-// Chat API service
-const chatAPI = {
-  async sendMessage(query, topK = 5) {
-    try {
-      const response = await fetch('https://nandinisingh18.app.n8n.cloud/webhook/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query,
-          top_k: topK
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Chat API error:', error);
-      throw error;
-    }
-  }
-};
+import { apiService } from '../config/api.js';
 
 // Citation component
 const Citation = ({ number, url, onClick }) => (
@@ -224,7 +197,7 @@ const Home = () => {
     setIsLoading(true);
 
     try {
-      const response = await chatAPI.sendMessage(userMessage);
+      const response = await apiService.sendChatMessage(userMessage);
       
       // Process API response
       if (response && response.length > 0) {
